@@ -36,11 +36,17 @@ public class TypedValue {
     public static final String DEX_TEMP_PATCH_DIR = "tempPatchedDexes";
     public static final String RES_LOG_FILE       = "res_log.txt";
     public static final String RES_META_TXT       = "res_meta.txt";
+    public static final String ARKHOT_META_TXT = "arkHot_meta.txt";
 
     public static final String FILE_ASSETS = "assets";
 
     public static final String TINKER_ID     = "TINKER_ID";
     public static final String NEW_TINKER_ID = "NEW_TINKER_ID";
+
+    // Please keep it synchronized with the one defined in ShareConstants.
+    public static final String PKGMETA_KEY_IS_PROTECTED_APP = "is_protected_app";
+
+    public static final String PKGMETA_KEY_USE_CUSTOM_FILE_PATCH = "use_custom_file_patch";
 
     public static final String PACKAGE_META_FILE = "package_meta.txt";
 

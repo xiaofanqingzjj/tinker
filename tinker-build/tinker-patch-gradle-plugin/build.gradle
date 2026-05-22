@@ -1,16 +1,19 @@
 apply plugin: 'groovy'
 
-
 version rootProject.ext.VERSION_NAME
 group rootProject.ext.GROUP
 
+sourceCompatibility = rootProject.ext.javaVersion
+targetCompatibility = rootProject.ext.javaVersion
+
 dependencies {
-    compile gradleApi()
-    compile localGroovy()
-//    compile fileTree(dir: 'libs', include: ['*.jar'])
-    compile project(':tinker-build:tinker-patch-lib')
-    compile 'com.google.gradle:osdetector-gradle-plugin:1.2.1'
-    compile 'com.android.tools.build:gradle:2.1.0'
+    implementation gradleApi()
+    implementation localGroovy()
+//    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    implementation project(':tinker-build:tinker-patch-lib')
+    implementation 'com.google.gradle:osdetector-gradle-plugin:1.7.0'
+    implementation 'commons-codec:commons-codec:1.10'
+    compileOnly 'com.android.tools.build:gradle:4.2.0'
 }
 
 repositories {
@@ -29,6 +32,5 @@ sourceSets {
     }
 }
 
-apply from: rootProject.file('gradle/java-artifacts.gradle')
-apply from: rootProject.file('gradle/gradle-mvn-push.gradle')
+apply from: rootProject.file('gradle/PublishArtifact.gradle')
 

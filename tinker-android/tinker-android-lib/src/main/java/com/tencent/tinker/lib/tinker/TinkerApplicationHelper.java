@@ -18,12 +18,13 @@ package com.tencent.tinker.lib.tinker;
 
 import android.content.Intent;
 
-import com.tencent.tinker.lib.util.TinkerLog;
+import com.tencent.tinker.entry.ApplicationLike;
+import com.tencent.tinker.loader.shareutil.ShareTinkerLog;
 import com.tencent.tinker.loader.TinkerRuntimeException;
-import com.tencent.tinker.loader.app.ApplicationLike;
 import com.tencent.tinker.loader.shareutil.ShareConstants;
 import com.tencent.tinker.loader.shareutil.ShareIntentUtil;
 import com.tencent.tinker.loader.shareutil.SharePatchFileUtil;
+import com.tencent.tinker.loader.shareutil.SharePatchInfo;
 import com.tencent.tinker.loader.shareutil.ShareTinkerInternals;
 
 import java.io.File;
@@ -241,10 +242,7 @@ public class TinkerApplicationHelper {
         if (applicationLike == null || applicationLike.getApplication() == null) {
             throw new TinkerRuntimeException("tinkerApplication is null");
         }
-        if (TinkerApplicationHelper.isTinkerLoadSuccess(applicationLike)) {
-            TinkerLog.e(TAG, "it is not safety to clean patch when tinker is loaded, you should kill all your process after clean!");
-        }
-        SharePatchFileUtil.deleteDir(SharePatchFileUtil.getPatchDirectory(applicationLike.getApplication()));
+        ShareTinkerInternals.cleanPatch(applicationLike.getApplication());
     }
 
     /**
@@ -340,10 +338,10 @@ public class TinkerApplicationHelper {
             final boolean verifyMd5 = applicationLike.getTinkerLoadVerifyFlag();
             if (verifyMd5 && !SharePatchFileUtil.verifyFileMd5(library, loadLibraries.get(name))) {
                 //do not report, because tinker is not install
-                TinkerLog.i(TAG, "loadLibraryFromTinker md5mismatch fail:" + patchLibraryPath);
+                ShareTinkerLog.i(TAG, "loadLibraryFromTinker md5mismatch fail:" + patchLibraryPath);
             } else {
                 System.load(patchLibraryPath);
-                TinkerLog.i(TAG, "loadLibraryFromTinker success:" + patchLibraryPath);
+                ShareTinkerLog.i(TAG, "loadLibraryFromTinker success:" + patchLibraryPath);
                 return true;
             }
         }

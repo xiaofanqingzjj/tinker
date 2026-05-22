@@ -17,7 +17,7 @@
 package com.tencent.tinker.build.util;
 
 import com.tencent.tinker.build.patch.Configuration;
-import com.tencent.tinker.commons.util.StreamUtil;
+import com.tencent.tinker.commons.util.IOHelper;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -39,18 +39,6 @@ import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
 
 public class FileOperation {
-    public static final boolean fileExists(String filePath) {
-        if (filePath == null) {
-            return false;
-        }
-
-        File file = new File(filePath);
-        if (file.exists()) {
-            return true;
-        }
-        return false;
-    }
-
     public static final boolean deleteFile(String filePath) {
         if (filePath == null) {
             return true;
@@ -81,6 +69,17 @@ public class FileOperation {
         return file.exists() && file.isFile() && file.length() > 0;
     }
 
+    public static boolean isLegalFileOrDirectory(String path) {
+        if (isLegalFile(path)) {
+            return true;
+        }
+        if (path == null) {
+            return false;
+        }
+        final File file = new File(path);
+        return file.exists() && file.isDirectory() && file.canRead();
+    }
+
     public static long getFileSizes(File f) {
         if (f == null) {
             return 0;
@@ -94,7 +93,7 @@ public class FileOperation {
             } catch (IOException e) {
                 e.printStackTrace();
             } finally {
-                StreamUtil.closeQuietly(fis);
+                IOHelper.closeQuietly(fis);
             }
         }
         return size;
@@ -141,8 +140,8 @@ public class FileOperation {
                 os.write(buffer, 0, length);
             }
         } finally {
-            StreamUtil.closeQuietly(os);
-            StreamUtil.closeQuietly(is);
+            IOHelper.closeQuietly(os);
+            IOHelper.closeQuietly(is);
         }
     }
 
@@ -163,8 +162,8 @@ public class FileOperation {
                 os.write(buffer, 0, length);
             }
         } finally {
-            StreamUtil.closeQuietly(os);
-            StreamUtil.closeQuietly(is);
+            IOHelper.closeQuietly(os);
+            IOHelper.closeQuietly(is);
         }
     }
 
@@ -187,6 +186,9 @@ public class FileOperation {
         try {
             while (enumeration.hasMoreElements()) {
                 ZipEntry entry = (ZipEntry) enumeration.nextElement();
+                if (!validateZipEntryName(new File(filePath), entry.getName())) {
+                    throw new IOException("Bad ZipEntry name: " + entry.getName());
+                }
                 if (entry.isDirectory()) {
                     new File(filePath, entry.getName()).mkdirs();
                     continue;
@@ -261,15 +263,15 @@ public class FileOperation {
                 rootpath = rootpath.replace("\\", "/");
             }
             ZipEntry entry = new ZipEntry(rootpath);
-//            if (compressMethod == ZipEntry.DEFLATED) {
+            // if (compressMethod == ZipEntry.DEFLATED) {
             entry.setMethod(ZipEntry.DEFLATED);
-//            } else {
-//                entry.setMethod(ZipEntry.STORED);
-//                entry.setSize(fileContents.length);
-//                final CRC32 checksumCalculator = new CRC32();
-//                checksumCalculator.update(fileContents);
-//                entry.setCrc(checksumCalculator.getValue());
-//            }
+            // } else {
+            //     entry.setMethod(ZipEntry.STORED);
+            //     entry.setSize(fileContents.length);
+            //     final CRC32 checksumCalculator = new CRC32();
+            //     checksumCalculator.update(fileContents);
+            //     entry.setCrc(checksumCalculator.getValue());
+            // }
             zipout.putNextEntry(entry);
             zipout.write(fileContents);
             zipout.flush();
@@ -292,8 +294,8 @@ public class FileOperation {
                 output.write(bufferCopy);
             }
         } finally {
-            StreamUtil.closeQuietly(output);
-            StreamUtil.closeQuietly(in);
+            IOHelper.closeQuietly(output);
+            IOHelper.closeQuietly(in);
         }
         return output.toByteArray();
     }
@@ -309,7 +311,7 @@ public class FileOperation {
             }
             return crc.getValue();
         } finally {
-            StreamUtil.closeQuietly(inputStream);
+            IOHelper.closeQuietly(inputStream);
         }
     }
 
@@ -384,7 +386,6 @@ public class FileOperation {
             while (reader.readLine() != null) {
             }
         } catch (IOException e) {
-//            e.printStackTrace();
             FileOperation.deleteFile(outputFile);
             Logger.e("7a patch file failed, you should set the zipArtifact, or set the path directly");
             return false;
@@ -400,8 +401,21 @@ public class FileOperation {
             } catch (Throwable ignored) {
                 // Ignored.
             }
-            StreamUtil.closeQuietly(reader);
+            IOHelper.closeQuietly(reader);
         }
         return true;
+    }
+
+    private static boolean validateZipEntryName(File destDir, String entryName) {
+        if (entryName == null || entryName.isEmpty()) {
+            return false;
+        }
+        try {
+            final String canonicalDestinationDir = destDir.getCanonicalPath();
+            final File destEntryFile = destDir.toPath().resolve(entryName).toFile();
+            return destEntryFile.getCanonicalPath().startsWith(canonicalDestinationDir + File.separator);
+        } catch (Throwable ignored) {
+            return false;
+        }
     }
 }

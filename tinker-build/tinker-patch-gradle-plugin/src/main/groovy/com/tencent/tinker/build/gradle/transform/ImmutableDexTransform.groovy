@@ -20,12 +20,11 @@ import com.android.annotations.NonNull
 import com.android.build.api.transform.*
 import com.android.build.gradle.internal.pipeline.TransformManager
 import com.android.build.gradle.internal.pipeline.TransformTask
-import com.android.build.gradle.internal.transforms.DexTransform
 import com.google.common.base.Joiner
 import com.google.common.collect.Lists
 import com.tencent.tinker.android.dex.ClassDef
 import com.tencent.tinker.android.dex.Dex
-import com.tencent.tinker.build.gradle.TinkerPatchPlugin
+import com.tencent.tinker.build.gradle.TinkerBuildPath
 import com.tencent.tinker.build.immutable.ClassSimDef
 import com.tencent.tinker.build.immutable.DexRefData
 import com.tencent.tinker.build.util.FileOperation
@@ -68,10 +67,10 @@ public class ImmutableDexTransform extends Transform {
 
     def variant
 
-    DexTransform dexTransform
+    def dexTransform
 
 
-    ImmutableDexTransform(Project project, def variant, DexTransform dexTransform) {
+    ImmutableDexTransform(Project project, def variant, def dexTransform) {
         this.dexTransform = dexTransform
         this.project = project
         this.variant = variant
@@ -97,8 +96,8 @@ public class ImmutableDexTransform extends Transform {
     }
 
     private File getDirInWorkDir(String name) {
-        return new File(PATH_JOINER.join(project.projectDir,
-                TinkerPatchPlugin.TINKER_INTERMEDIATES,
+        return new File(PATH_JOINER.join(
+                TinkerBuildPath.getTinkerIntermediates(project),
                 TASK_WORK_DIR,
                 name,
                 varDirName)
@@ -127,7 +126,7 @@ public class ImmutableDexTransform extends Transform {
     @NonNull
     @Override
     public Map<String, Object> getParameterInputs() {
-       return dexTransform.getParameterInputs()
+        return dexTransform.getParameterInputs()
     }
 
     @Override
@@ -358,12 +357,17 @@ public class ImmutableDexTransform extends Transform {
 
     public static void inject(Project project, def variant) {
         project.logger.info("prepare inject dex transform ")
-        if (!variant.variantData.variantConfiguration.isMultiDexEnabled()) {
-            project.logger.warn("multidex is diable. we will not replace the dex transform.")
+        if (!variant.mergedFlavor.multiDexEnabled) {
+            project.logger.warn("multidex is disabled. we will not replace the dex transform.")
             return
         }
         if (!FileOperation.isLegalFile(project.tinkerPatch.oldApk)) {
             project.logger.warn("oldApk is illegal. we will not replace the dex transform.")
+            return
+        }
+        try {
+            Class.forName("com.android.build.gradle.internal.transforms.DexTransform")
+        } catch (ClassNotFoundException e) {
             return
         }
 
@@ -371,12 +375,14 @@ public class ImmutableDexTransform extends Transform {
             @Override
             public void graphPopulated(TaskExecutionGraph taskGraph) {
                 for (Task task : taskGraph.getAllTasks()) {
+                    if (task.project != project) {
+                        continue
+                    }
                     if (task instanceof TransformTask && task.name.toLowerCase().contains(variant.name.toLowerCase())) {
-
-                        if (((TransformTask) task).getTransform() instanceof DexTransform && !(((TransformTask) task).getTransform() instanceof ImmutableDexTransform)) {
+                        if (((TransformTask) task).getTransform().getClass() == Class.forName("com.android.build.gradle.internal.transforms.DexTransform") && !(((TransformTask) task).getTransform() instanceof ImmutableDexTransform)) {
                             project.logger.warn("find dex transform. transform class: " + task.transform.getClass() + " . task name: " + task.name)
 
-                            DexTransform dexTransform = task.transform
+                            def dexTransform = task.transform
                             ImmutableDexTransform hookDexTransform = new ImmutableDexTransform(project,
                                     variant, dexTransform)
                             project.logger.info("variant name: " + variant.name)

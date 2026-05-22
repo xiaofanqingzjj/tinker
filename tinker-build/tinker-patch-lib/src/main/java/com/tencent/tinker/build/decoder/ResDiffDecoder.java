@@ -16,11 +16,12 @@
 
 package com.tencent.tinker.build.decoder;
 
-import com.tencent.tinker.bsdiff.BSDiff;
 import com.tencent.tinker.build.apkparser.AndroidParser;
 import com.tencent.tinker.build.info.InfoWriter;
 import com.tencent.tinker.build.patch.Configuration;
+import com.tencent.tinker.build.util.DiffFactory;
 import com.tencent.tinker.build.util.FileOperation;
+import com.tencent.tinker.build.util.CustomDiff;
 import com.tencent.tinker.build.util.Logger;
 import com.tencent.tinker.build.util.MD5;
 import com.tencent.tinker.build.util.TinkerPatchException;
@@ -208,12 +209,15 @@ public class ResDiffDecoder extends BaseDecoder {
             Logger.d("found modify resource: " + name + ", but it is AndroidManifest.xml, just ignore!");
             return false;
         }
-        if (name.equals(TypedValue.RES_ARSC)) {
-            if (AndroidParser.resourceTableLogicalChange(config)) {
-                Logger.d("found modify resource: " + name + ", but it is logically the same as original new resources.arsc, just ignore!");
-                return false;
-            }
-        }
+        // Even if the new resources.arsc is logically the same as the old one, we still
+        // need to generate diff for it since resources reordering can cause locating issue
+        // too.
+        // if (name.equals(TypedValue.RES_ARSC)) {
+        //     if (AndroidParser.resourceTableLogicalChange(config)) {
+        //         Logger.d("found modify resource: " + name + ", but it is logically the same as original new resources.arsc, just ignore!");
+        //         return false;
+        //     }
+        // }
         dealWithModifyFile(name, newMd5, oldFile, newFile, outputFile);
         return true;
     }
@@ -223,7 +227,7 @@ public class ResDiffDecoder extends BaseDecoder {
             if (!outputFile.getParentFile().exists()) {
                 outputFile.getParentFile().mkdirs();
             }
-            BSDiff.bsdiff(oldFile, newFile, outputFile);
+            DiffFactory.diffFile(config, oldFile, newFile, outputFile);
             //treat it as normal modify
             if (Utils.checkBsDiffFileSize(outputFile, newFile)) {
                 LargeModeInfo largeModeInfo = new LargeModeInfo();
@@ -270,6 +274,8 @@ public class ResDiffDecoder extends BaseDecoder {
                     Logger.d("Found large modify resource: " + relative + " size:" + newFile.length());
                     log = "large modify resource: " + relative + ", oldSize=" + FileOperation.getFileSizes(oldFile) + ", newSize="
                         + FileOperation.getFileSizes(newFile);
+                    break;
+                default:
                     break;
             }
             logWriter.writeLineToInfoFile(log);
@@ -401,19 +407,7 @@ public class ResDiffDecoder extends BaseDecoder {
     private void checkIfSpecificResWasAnimRes(Collection<String> specificFileNames) {
         final Set<String> changedAnimResNames = new HashSet<>();
         for (String resFileName : specificFileNames) {
-            String resName = resFileName;
-            int lastPathSepPos = resFileName.lastIndexOf('/');
-            if (lastPathSepPos < 0) {
-                lastPathSepPos = resFileName.lastIndexOf('\\');
-            }
-            if (lastPathSepPos >= 0) {
-                resName = resName.substring(lastPathSepPos + 1);
-            }
-            final int firstDotPos = resName.indexOf('.');
-            if (firstDotPos >= 0) {
-                resName = resName.substring(0, firstDotPos);
-            }
-            if (newApkAnimResNames.contains(resName)) {
+            if (newApkAnimResNames.contains(resFileName)) {
                 if (Utils.isStringMatchesPatterns(resFileName, config.mResIgnoreChangeWarningPattern)) {
                     Logger.d("\nAnimation resource: " + resFileName
                             + " was changed, but it's filtered by ignoreChangeWarning pattern, just ignore.\n");
@@ -460,12 +454,13 @@ public class ResDiffDecoder extends BaseDecoder {
             }
 
         } catch (Throwable throwable) {
-
+            // Ignored.
         } finally {
             if (zipFile != null) {
                 try {
                     zipFile.close();
                 } catch (IOException e) {
+                    // Ignored.
                 }
             }
         }
@@ -504,6 +499,8 @@ public class ResDiffDecoder extends BaseDecoder {
                     break;
                 case TypedValue.STORED:
                     title = TypedValue.STORE_TITLE + set.size();
+                    break;
+                default:
                     break;
             }
             metaWriter.writeLineToInfoFile(title);

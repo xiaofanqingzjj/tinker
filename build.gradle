@@ -2,19 +2,22 @@
 buildscript {
     repositories {
         mavenLocal()
-        jcenter()
+        mavenCentral()
+        gradlePluginPortal()
+        google()
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:2.2.0'
-        classpath 'com.jfrog.bintray.gradle:gradle-bintray-plugin:1.6'
-        classpath "com.github.dcendents:android-maven-gradle-plugin:1.4.1"
+        classpath 'com.android.tools.build:gradle:4.2.0'
+        classpath "com.github.johnrengelman.shadow:com.github.johnrengelman.shadow.gradle.plugin:4.0.4"
     }
 }
 
 allprojects {
     repositories {
         mavenLocal()
-        jcenter()
+        mavenCentral()
+        gradlePluginPortal()
+        google()
     }
 
     tasks.withType(Javadoc).all {
@@ -25,30 +28,25 @@ allprojects {
 
 ext {
     minSdkVersion = 10
-    compileSdkVersion = 23
-    targetSdkVersion = compileSdkVersion
-    buildToolsVersion = '23.0.2'
-    supportLibVersion = '23.0.1'
-    javaVersion = JavaVersion.VERSION_1_7
+    compileSdkVersion = 29
+    targetSdkVersion = 23
+    buildToolsVersion = '28.0.3'
+    androidXAnnotationVersion = '1.1.0'
+    javaVersion = JavaVersion.VERSION_1_8
 
     GROUP = 'com.tencent.tinker'
-    VERSION_NAME = "${VERSION_NAME_PREFIX}${VERSION_NAME_SUFFIX}"
+    VERSION_NAME = '1.9.15.3-fix1'
 
-    POM_PACKAGING = "pom"
-    POM_DESCRIPTION= "tinker"
+    POM_DESCRIPTION = 'Tinker is a hot-fix solution library for Android, it supports dex, library and resources update without reinstalling apk.'
+    POM_URL = 'https://github.com/Tencent/tinker'
+    POM_SCM_URL = 'https://github.com/Tencent/tinker.git'
 
-    POM_URL = "https://github.com/Tencent/tinker"
-    POM_SCM_URL = "https://github.com/Tencent/tinker.git"
-    POM_ISSUE_URL = 'https://github.com/Tencent/tinker/issues'
+    POM_LICENCE_NAME = 'BSD License'
+    POM_LICENCE_URL = 'https://opensource.org/licenses/BSD-3-Clause'
+    POM_LICENCE_DIST = 'repo'
 
-    POM_LICENCE_NAME = "BSD License"
-    POM_LICENCE_URL = "https://opensource.org/licenses/BSD-3-Clause"
-    POM_LICENCE_DIST = "repo"
-
-    POM_DEVELOPER_ID="Tencent Wechat"
-    POM_DEVELOPER_NAME="Tencent Wechat, Inc."
-
-    BINTRAY_LICENCE= ['BSD 3-Clause']
-    BINTRAY_ORGANIZATION = "tinker"
-
+    POM_DEVELOPER_ID = 'Tencent Wechat'
+    POM_DEVELOPER_NAME = 'Tencent Wechat, Inc.'
 }
+
+apply from: rootProject.file('gradle/check.gradle')

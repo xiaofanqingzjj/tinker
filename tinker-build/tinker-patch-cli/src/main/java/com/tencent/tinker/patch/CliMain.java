@@ -43,13 +43,17 @@ public class CliMain extends Runner {
     private static final String ARG_CONFIG = "-config";
     private static final String ARG_OLD    = "-old";
     private static final String ARG_NEW    = "-new";
-
+    private static final String ARG_CUSTOM_PATH = "-customPath";
 
     protected static String mRunningLocation;
 
+    private CliMain(boolean isGradleMode) {
+        super(isGradleMode);
+    }
+
     public static void main(String[] args) {
         mBeginTime = System.currentTimeMillis();
-        CliMain m = new CliMain();
+        CliMain m = new CliMain(false);
         setRunningLocation(m);
         m.run(args);
     }
@@ -73,13 +77,13 @@ public class CliMain extends Runner {
         String command = "tinker.jar"; //$NON-NLS-1$
         out.println();
         out.println();
-        out.println("Usage: java -jar " + command + " " + ARG_OLD + " old.apk " + ARG_NEW + " new.apk " + ARG_CONFIG + " tinker_config.xml " + ARG_OUT + " output_path");
+        out.println("Usage: java -jar " + command + " " + ARG_OLD + " old.apk " + ARG_NEW + " new.apk " + ARG_CONFIG + " tinker_config.xml " + ARG_OUT + " output_path " + ARG_CONFIG + " custom_file_cmd_path");
         out.println("others please contact us");
     }
 
     private void run(String[] args) {
         if (args.length < 1) {
-            goToError();
+            goToError(new IllegalArgumentException("Please provide required arguments."), ERRNO_USAGE);
         }
         try {
 
@@ -88,13 +92,12 @@ public class CliMain extends Runner {
             File outputFile = readArgs.getOutputFile();
             File oldApkFile = readArgs.getOldApkFile();
             File newApkFile = readArgs.getNewApkFile();
+            String customDiffCmd = readArgs.getCustomDiffCmd();
 
             if (oldApkFile == null || newApkFile == null) {
-                Logger.e("Missing old apk or new apk file argument");
-                goToError();
+                goToError(new IllegalArgumentException("Missing old apk or new apk file argument"), ERRNO_ERRORS);
             } else if (!oldApkFile.exists() || !newApkFile.exists()) {
-                Logger.e("Old apk or new apk file does not exist");
-                goToError();
+                goToError(new IOException("Old apk or new apk file does not exist"), ERRNO_ERRORS);
             }
 
             if (outputFile == null) {
@@ -102,11 +105,13 @@ public class CliMain extends Runner {
             }
 
             loadConfigFromXml(configFile, outputFile, oldApkFile, newApkFile);
-            Logger.initLogger(config);
+            if (customDiffCmd != null) {
+                mConfig.mCustomDiffPath = customDiffCmd;
+            }
+            Logger.initLogger(mConfig);
             tinkerPatch();
         } catch (IOException e) {
-            e.printStackTrace();
-            goToError();
+            goToError(e, ERRNO_ERRORS);
         } finally {
             Logger.closeLogger();
         }
@@ -122,20 +127,12 @@ public class CliMain extends Runner {
             }
         }
         try {
-            config = new Configuration(configFile, outputFile, oldApkFile, newApkFile);
-
+            mConfig = new Configuration(configFile, outputFile, oldApkFile, newApkFile);
         } catch (IOException | ParserConfigurationException | SAXException e) {
-            e.printStackTrace();
-            goToError();
+            goToError(e, ERRNO_ERRORS);
         } catch (TinkerPatchException e) {
-            e.printStackTrace();
-            goToError();
+            goToError(e, ERRNO_ERRORS);
         }
-    }
-
-    public void goToError() {
-        printUsage(System.err);
-        System.exit(ERRNO_USAGE);
     }
 
     private class ReadArgs {
@@ -144,6 +141,7 @@ public class CliMain extends Runner {
         private File     outputFile;
         private File     oldApkFile;
         private File     newApkFile;
+        private String   customDiffCmd;
 
         ReadArgs(String[] args) {
             this.args = args;
@@ -165,28 +163,28 @@ public class CliMain extends Runner {
             return newApkFile;
         }
 
+        public String getCustomDiffCmd() {
+            return customDiffCmd;
+        }
+
         public ReadArgs invoke() {
             for (int index = 0; index < args.length; index++) {
                 String arg = args[index];
                 if (arg.equals(ARG_HELP) || arg.equals("-h")) {
-                    goToError();
+                    printUsage(System.out);
+                    return this;
                 } else if (arg.equals(ARG_CONFIG)) {
                     if (index == args.length - 1 || !args[index + 1].endsWith(TypedValue.FILE_XML)) {
-                        System.err.println("Missing XML configuration file argument");
-                        goToError();
+                        goToError(new IllegalArgumentException("Missing XML configuration file argument"), ERRNO_USAGE);
                     }
                     configFile = new File(args[++index]);
                     if (!configFile.exists()) {
-                        System.err.println(configFile.getAbsolutePath() + " does not exist");
-                        goToError();
+                        goToError(new IOException(configFile.getAbsolutePath() + " does not exist"), ERRNO_ERRORS);
                     }
-
                     System.out.println("special configFile file path:" + configFile.getAbsolutePath());
-
                 } else if (arg.equals(ARG_OUT)) {
                     if (index == args.length - 1) {
-                        System.err.println("Missing output file argument");
-                        goToError();
+                        goToError(new IllegalArgumentException("Missing output file argument"), ERRNO_USAGE);
                     }
                     outputFile = new File(args[++index]);
                     File parent = outputFile.getParentFile();
@@ -194,25 +192,26 @@ public class CliMain extends Runner {
                         parent.mkdirs();
                     }
                     System.out.printf("special output directory path: %s\n", outputFile.getAbsolutePath());
-
                 } else if (arg.equals(ARG_OLD)) {
                     if (index == args.length - 1) {
-                        System.err.println("Missing old apk file argument");
-                        goToError();
+                        goToError(new IllegalArgumentException("Missing old apk file argument"), ERRNO_USAGE);
                     }
                     oldApkFile = new File(args[++index]);
                 } else if (arg.equals(ARG_NEW)) {
                     if (index == args.length - 1) {
-                        System.err.println("Missing new apk file argument");
-                        goToError();
+                        goToError(new IllegalArgumentException("Missing new apk file argument"), ERRNO_USAGE);
                     }
                     newApkFile = new File(args[++index]);
+                } else if (arg.equals(ARG_CUSTOM_PATH)) {
+                    if (index == args.length - 1) {
+                        goToError(new IllegalArgumentException("Missing output file argument"), ERRNO_USAGE);
+                    }
+                    customDiffCmd = args[++index];
+                    System.out.printf("special output custom diff cmd: %s\n", customDiffCmd);
                 }
             }
             return this;
         }
     }
-
-
 }
 

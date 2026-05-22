@@ -1,13 +1,17 @@
-apply plugin: 'java'
+apply plugin: 'java-library'
+apply plugin: "com.github.johnrengelman.shadow"
 
 version rootProject.ext.VERSION_NAME
 group rootProject.ext.GROUP
 
 [compileJava, compileTestJava, javadoc]*.options*.encoding = 'UTF-8'
 
+sourceCompatibility = rootProject.ext.javaVersion
+targetCompatibility = rootProject.ext.javaVersion
+
 dependencies {
-    compile fileTree(dir: 'libs', include: ['*.jar'])
-    compile project(':tinker-build:tinker-patch-lib')
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    implementation project(':tinker-build:tinker-patch-lib')
 }
 
 jar {
@@ -15,13 +19,10 @@ jar {
         attributes 'Main-Class': 'com.tencent.tinker.patch.CliMain'
         attributes 'Manifest-Version': version
     }
-    from {
-        configurations.compile.collect { it.isDirectory() ? it : zipTree(it) }
-    }
 }
 
 // copy the jar to work directory
-task buildTinkerSdk(type: Copy, dependsOn: [build, jar]) {
+task buildTinkerSdk(type: Copy, dependsOn: [clean, shadowJar]) {
     group = "tinker"
     from('build/libs') {
         include '*.jar'

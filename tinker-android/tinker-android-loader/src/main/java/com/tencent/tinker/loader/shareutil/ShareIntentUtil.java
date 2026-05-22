@@ -17,7 +17,6 @@
 package com.tencent.tinker.loader.shareutil;
 
 import android.content.Intent;
-import android.util.Log;
 
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -31,6 +30,8 @@ public class ShareIntentUtil {
     public static final  String INTENT_RETURN_CODE               = "intent_return_code";
     public static final  String INTENT_PATCH_OLD_VERSION         = "intent_patch_old_version";
     public static final  String INTENT_PATCH_NEW_VERSION         = "intent_patch_new_version";
+    public static final  String INTENT_IS_PROTECTED_APP          = "intent_is_protected_app";
+    public static final  String INTENT_USE_CUSTOM_PATCH          = "intent_use_custom_patch";
     public static final  String INTENT_PATCH_MISMATCH_DEX_PATH   = "intent_patch_mismatch_dex_path";
     public static final  String INTENT_PATCH_MISSING_DEX_PATH    = "intent_patch_missing_dex_path";
     public static final  String INTENT_PATCH_DEXES_PATH          = "intent_patch_dexes_path";
@@ -113,7 +114,7 @@ public class ShareIntentUtil {
         try {
             ret = intent.getStringArrayListExtra(name);
         } catch (Exception e) {
-            Log.e(TAG, "getStringExtra exception:" + e.getMessage());
+            ShareTinkerLog.e(TAG, "getStringExtra exception:" + e.getMessage());
             ret = null;
         }
         return ret;
@@ -128,7 +129,7 @@ public class ShareIntentUtil {
         try {
             ret = intent.getStringExtra(name);
         } catch (Exception e) {
-            Log.e(TAG, "getStringExtra exception:" + e.getMessage());
+            ShareTinkerLog.e(TAG, "getStringExtra exception:" + e.getMessage());
             ret = null;
         }
         return ret;
@@ -142,7 +143,7 @@ public class ShareIntentUtil {
         try {
             ret = intent.getSerializableExtra(name);
         } catch (Exception e) {
-            Log.e(TAG, "getSerializableExtra exception:" + e.getMessage());
+            ShareTinkerLog.e(TAG, "getSerializableExtra exception:" + e.getMessage());
             ret = null;
         }
         return ret;
@@ -156,7 +157,7 @@ public class ShareIntentUtil {
         try {
             ret = intent.getIntExtra(name, defaultValue);
         } catch (Exception e) {
-            Log.e(TAG, "getIntExtra exception:" + e.getMessage());
+            ShareTinkerLog.e(TAG, "getIntExtra exception:" + e.getMessage());
             ret = defaultValue;
         }
         return ret;
@@ -171,7 +172,7 @@ public class ShareIntentUtil {
         try {
             ret = intent.getBooleanExtra(name, defaultValue);
         } catch (Exception e) {
-            Log.e(TAG, "getBooleanExtra exception:" + e.getMessage());
+            ShareTinkerLog.e(TAG, "getBooleanExtra exception:" + e.getMessage());
             ret = defaultValue;
         }
         return ret;
@@ -185,7 +186,7 @@ public class ShareIntentUtil {
         try {
             ret = intent.getLongExtra(name, defaultValue);
         } catch (Exception e) {
-            Log.e(TAG, "getIntExtra exception:" + e.getMessage());
+            ShareTinkerLog.e(TAG, "getIntExtra exception:" + e.getMessage());
             ret = defaultValue;
         }
         return ret;

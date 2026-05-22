@@ -21,17 +21,14 @@ import android.app.Application;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
-import android.support.multidex.MultiDex;
+import androidx.multidex.MultiDex;
 
 import com.tencent.tinker.anno.DefaultLifeCycle;
+import com.tencent.tinker.entry.ApplicationLifeCycle;
+import com.tencent.tinker.entry.DefaultApplicationLike;
 import com.tencent.tinker.lib.tinker.Tinker;
 import com.tencent.tinker.lib.tinker.TinkerInstaller;
-import com.tencent.tinker.lib.util.TinkerLog;
-import com.tencent.tinker.loader.app.ApplicationLifeCycle;
-import com.tencent.tinker.loader.app.DefaultApplicationLike;
 import com.tencent.tinker.loader.shareutil.ShareConstants;
-
-import java.util.regex.Pattern;
 
 import tinker.sample.android.Log.MyLogImp;
 import tinker.sample.android.util.SampleApplicationContext;

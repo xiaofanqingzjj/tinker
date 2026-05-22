@@ -18,7 +18,7 @@ package com.tencent.tinker.build.aapt;
 
 import com.tencent.tinker.build.aapt.RDotTxtEntry.IdType;
 import com.tencent.tinker.build.aapt.RDotTxtEntry.RType;
-import com.tencent.tinker.commons.util.StreamUtil;
+import com.tencent.tinker.commons.util.IOHelper;
 
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -243,6 +243,8 @@ public final class AaptUtil {
                 case ATTR://no sub item
                     resourceValue = nodeToString(node, true);
                     break;
+                default:
+                    break;
             }
             try {
                 addToResourceCollector(resourceCollector, new ResourceDirectory(directoryName, valuesFullFilename), node, rType, resourceValue);
@@ -277,14 +279,19 @@ public final class AaptUtil {
             if (name.startsWith("android:")) {
                 continue;
             }
+
+            if (rawRType.startsWith("tools:")) {
+                continue;
+            }
+
             if (!RESOURCE_TYPES.containsKey(rawRType)) {
                 throw new AaptUtilException("Invalid reference '" + resourceName + "' in '" + xmlFullFilename + "'");
             }
             RType rType = RESOURCE_TYPES.get(rawRType);
 
-//if(!resourceCollector.isContainResource(rType, IdType.INT, sanitizeName(resourceCollector, name))){
-//throw new AaptUtilException("Not found reference '" + resourceName + "' in '" + xmlFullFilename + "'");
-//}
+            // if (!resourceCollector.isContainResource(rType, IdType.INT, sanitizeName(resourceCollector, name))) {
+            //     throw new AaptUtilException("Not found reference '" + resourceName + "' in '" + xmlFullFilename + "'");
+            // }
             references.add(new FakeRDotTxtEntry(IdType.INT, rType, sanitizeName(rType, resourceCollector, name)));
         }
     }
@@ -398,7 +405,7 @@ public final class AaptUtil {
         } catch (Exception e) {
             throw new AaptUtilException(e);
         } finally {
-            StreamUtil.closeQuietly(writer);
+            IOHelper.closeQuietly(writer);
         }
     }
 

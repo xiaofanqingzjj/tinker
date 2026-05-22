@@ -20,7 +20,7 @@ import com.tencent.tinker.build.apkparser.AndroidParser;
 import com.tencent.tinker.build.patch.Configuration;
 import com.tencent.tinker.build.util.TinkerPatchException;
 import com.tencent.tinker.build.util.TypedValue;
-import com.tencent.tinker.commons.util.StreamUtil;
+import com.tencent.tinker.commons.util.IOHelper;
 
 import java.io.BufferedOutputStream;
 import java.io.File;
@@ -29,6 +29,8 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.text.ParseException;
 import java.util.Properties;
+
+import tinker.net.dongliu.apk.parser.utils.Utils;
 
 /**
  * Created by zhangshaowen on 16/3/8.
@@ -64,8 +66,21 @@ public class PatchInfoGen {
         }
     }
 
+    private void addProtectedAppFlag() {
+        // If user happens to specify a value with this key, just override it for logic correctness.
+        config.mPackageFields.put(TypedValue.PKGMETA_KEY_IS_PROTECTED_APP, config.mIsProtectedApp ? "1" : "0");
+    }
+
+    private void addFilePatchFlag() {
+        // If use custom file patcher
+        config.mPackageFields.put(TypedValue.PKGMETA_KEY_USE_CUSTOM_FILE_PATCH, Utils.isEmpty(config.mCustomDiffPath) ? "0" : "1" );
+    }
+
     public void gen() throws Exception {
         addTinkerID();
+        addProtectedAppFlag();
+        addFilePatchFlag();
+
         Properties newProperties = new Properties();
         for (String key : config.mPackageFields.keySet()) {
             newProperties.put(key, config.mPackageFields.get(key));
@@ -77,7 +92,7 @@ public class PatchInfoGen {
             os = new BufferedOutputStream(new FileOutputStream(packageInfoFile, false));
             newProperties.store(os, comment);
         } finally {
-            StreamUtil.closeQuietly(os);
+            IOHelper.closeQuietly(os);
         }
     }
 }

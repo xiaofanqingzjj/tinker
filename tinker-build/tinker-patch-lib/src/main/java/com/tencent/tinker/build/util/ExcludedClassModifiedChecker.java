@@ -181,7 +181,13 @@ public final class ExcludedClassModifiedChecker {
                     throw new TinkerPatchException("new primary dex is missing.");
                 }
                 case STMCODE_ERROR_LOADER_CLASS_NOT_IN_PRIMARY_OLD_DEX: {
-                    throw new TinkerPatchException("all loader classes don't appear in old primary dex.");
+                    final String msg = "all loader classes don't appear in old primary dex.";
+                    if (config.mAllowLoaderInAnyDex) {
+                        Logger.d(msg);
+                        return;
+                    } else {
+                        throw new TinkerPatchException(msg);
+                    }
                 }
                 case STMCODE_ERROR_LOADER_CLASS_IN_PRIMARY_DEX_MISMATCH: {
                     throw new TinkerPatchException(
@@ -190,10 +196,22 @@ public final class ExcludedClassModifiedChecker {
                     );
                 }
                 case STMCODE_ERROR_LOADER_CLASS_FOUND_IN_SECONDARY_OLD_DEX: {
-                    throw new TinkerPatchException("loader classes are found in old secondary dex. Found classes: " + Utils.collectionToString(oldClassesDescToCheck));
+                    final String msg = "loader classes are found in old secondary dex. Found classes: " + Utils.collectionToString(oldClassesDescToCheck);
+                    if (config.mAllowLoaderInAnyDex) {
+                        Logger.d(msg);
+                        return;
+                    } else {
+                        throw new TinkerPatchException(msg);
+                    }
                 }
                 case STMCODE_ERROR_LOADER_CLASS_FOUND_IN_SECONDARY_NEW_DEX: {
-                    throw new TinkerPatchException("loader classes are found in new secondary dex. Found classes: " + Utils.collectionToString(newClassesDescToCheck));
+                    final String msg = "loader classes are found in new secondary dex. Found classes: " + Utils.collectionToString(newClassesDescToCheck);
+                    if (config.mAllowLoaderInAnyDex) {
+                        Logger.d(msg);
+                        return;
+                    } else {
+                        throw new TinkerPatchException(msg);
+                    }
                 }
                 case STMCODE_ERROR_LOADER_CLASS_CHANGED: {
                     String msg =

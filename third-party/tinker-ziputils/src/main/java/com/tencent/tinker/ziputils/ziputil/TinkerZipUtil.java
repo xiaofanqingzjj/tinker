@@ -26,7 +26,7 @@ import java.io.InputStream;
  * Created by zhangshaowen on 16/8/10.
  */
 public class TinkerZipUtil {
-    private static final int BUFFER_SIZE = 16384;
+    private static final int BUFFER_SIZE = 4096;
 
     public static void extractTinkerEntry(TinkerZipFile apk, TinkerZipEntry zipEntry, TinkerZipOutputStream outputStream) throws IOException {
         InputStream in = null;
@@ -44,16 +44,6 @@ public class TinkerZipUtil {
                 in.close();
             }
         }
-    }
-
-    public static void extractTinkerEntry(TinkerZipEntry zipEntry, InputStream inputStream, TinkerZipOutputStream outputStream) throws IOException {
-        outputStream.putNextEntry(zipEntry);
-        byte[] buffer = new byte[BUFFER_SIZE];
-
-        for (int length = inputStream.read(buffer); length != -1; length = inputStream.read(buffer)) {
-            outputStream.write(buffer, 0, length);
-        }
-        outputStream.closeEntry();
     }
 
     public static void extractLargeModifyFile(TinkerZipEntry sourceArscEntry, File newFile, long newFileCrc, TinkerZipOutputStream outputStream) throws IOException {
@@ -77,6 +67,19 @@ public class TinkerZipUtil {
             if (in != null) {
                 in.close();
             }
+        }
+    }
+
+    public static boolean validateZipEntryName(File destDir, String entryName) {
+        if (entryName == null || entryName.isEmpty()) {
+            return false;
+        }
+        try {
+            final String canonicalDestinationDir = destDir.getCanonicalPath();
+            final File destEntryFile = new File(destDir, entryName);
+            return destEntryFile.getCanonicalPath().startsWith(canonicalDestinationDir + File.separator);
+        } catch (Throwable ignored) {
+            return false;
         }
     }
 }

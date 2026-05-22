@@ -1,16 +1,18 @@
-apply plugin: 'java'
+apply plugin: 'java-library'
 
 version rootProject.ext.VERSION_NAME
 group rootProject.ext.GROUP
 
 [compileJava, compileTestJava, javadoc]*.options*.encoding = 'UTF-8'
 
+sourceCompatibility = rootProject.ext.javaVersion
+targetCompatibility = rootProject.ext.javaVersion
 
 dependencies {
-    compile fileTree(dir: 'libs', include: ['*.jar'])
-    compile project(':third-party:aosp-dexutils')
-    compile project(':third-party:bsdiff-util')
-    compile project(':third-party:tinker-ziputils')
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    api project(':third-party:aosp-dexutils')
+    api project(':third-party:bsdiff-util')
+    api project(':third-party:tinker-ziputils')
 }
 
 task buildTinkerSdk(type: Copy, dependsOn: [build]) {
@@ -23,5 +25,4 @@ task buildTinkerSdk(type: Copy, dependsOn: [build]) {
     into(rootProject.file("buildSdk/android"))
 }
 
-apply from: rootProject.file('gradle/java-artifacts.gradle')
-apply from: rootProject.file('gradle/gradle-mvn-push.gradle')
+apply from: rootProject.file('gradle/PublishArtifact.gradle')

@@ -19,6 +19,7 @@ import android.util.Xml;
 import com.tencent.tinker.loader.shareutil.SharePatchFileUtil;
 import com.tencent.tinker.loader.shareutil.ShareReflectUtil;
 import com.tencent.tinker.loader.shareutil.ShareSecurityCheck;
+import com.tencent.tinker.loader.shareutil.ShareTinkerLog;
 
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
@@ -44,8 +45,8 @@ public final class IncrementComponentManager {
     private static Context sContext = null;
     private static String sPackageName = null;
     private static volatile boolean sInitialized = false;
-    private static final Map<String, ActivityInfo> sClassNameToActivityInfoMap = new HashMap<>();
-    private static final Map<String, IntentFilter> sClassNameToIntentFilterMap = new HashMap<>();
+    private static final Map<String, ActivityInfo> CLASS_NAME_TO_ACTIVITY_INFO_MAP = new HashMap<>();
+    private static final Map<String, IntentFilter> CLASS_NAME_TO_INTENT_FILTER_MAP = new HashMap<>();
 
 
     private static abstract class AttrTranslator<T_RESULT> {
@@ -71,7 +72,7 @@ public final class IncrementComponentManager {
         abstract void onTranslate(Context context, int tagType, String attrName, String attrValue, T_RESULT result);
     }
 
-    private static final AttrTranslator<ActivityInfo> sActivityInfoAttrTranslator = new AttrTranslator<ActivityInfo>() {
+    private static final AttrTranslator<ActivityInfo> ACTIVITY_INFO_ATTR_TRANSLATOR = new AttrTranslator<ActivityInfo>() {
 
         @Override
         void onInit(Context context, int tagType, XmlPullParser parser) {
@@ -294,7 +295,7 @@ public final class IncrementComponentManager {
             } else if ("singleInstance".equalsIgnoreCase(attrValue)) {
                 return ActivityInfo.LAUNCH_SINGLE_INSTANCE;
             } else {
-                Log.w(TAG, "Unknown launchMode: " + attrValue);
+                ShareTinkerLog.w(TAG, "Unknown launchMode: " + attrValue);
                 return ActivityInfo.LAUNCH_MULTIPLE;
             }
         }
@@ -340,7 +341,7 @@ public final class IncrementComponentManager {
 
     public static synchronized boolean init(Context context, ShareSecurityCheck checker) throws IOException {
         if (!checker.getMetaContentMap().containsKey(EnvConsts.INCCOMPONENT_META_FILE)) {
-            Log.i(TAG, "package has no incremental component meta, skip init.");
+            ShareTinkerLog.i(TAG, "package has no incremental component meta, skip init.");
             return false;
         }
         while (context instanceof ContextWrapper) {
@@ -365,7 +366,7 @@ public final class IncrementComponentManager {
                         final String tagName = parser.getName();
                         if ("activity".equalsIgnoreCase(tagName)) {
                             final ActivityInfo aInfo = parseActivity(context, parser);
-                            sClassNameToActivityInfoMap.put(aInfo.name, aInfo);
+                            CLASS_NAME_TO_ACTIVITY_INFO_MAP.put(aInfo.name, aInfo);
                         } else if ("service".equalsIgnoreCase(tagName)) {
                             // TODO support service component.
                         } else if ("receiver".equalsIgnoreCase(tagName)) {
@@ -420,7 +421,7 @@ public final class IncrementComponentManager {
             aInfo.uiOptions = appInfo.uiOptions;
         }
 
-        sActivityInfoAttrTranslator.translate(context, TAG_ACTIVITY, parser, aInfo);
+        ACTIVITY_INFO_ATTR_TRANSLATOR.translate(context, TAG_ACTIVITY, parser, aInfo);
 
         final int outerDepth = parser.getDepth();
         while (true) {
@@ -532,7 +533,7 @@ public final class IncrementComponentManager {
             skipCurrentTag(parser);
         }
 
-        sClassNameToIntentFilterMap.put(componentName, intentFilter);
+        CLASS_NAME_TO_INTENT_FILTER_MAP.put(componentName, intentFilter);
     }
 
     private static synchronized void parseMetaData(Context context, ActivityInfo aInfo, XmlPullParser parser)
@@ -565,12 +566,12 @@ public final class IncrementComponentManager {
 
     public static boolean isIncrementActivity(String className) {
         ensureInitialized();
-        return className != null && sClassNameToActivityInfoMap.containsKey(className);
+        return className != null && CLASS_NAME_TO_ACTIVITY_INFO_MAP.containsKey(className);
     }
 
     public static ActivityInfo queryActivityInfo(String className) {
         ensureInitialized();
-        return (className != null ? sClassNameToActivityInfoMap.get(className) : null);
+        return (className != null ? CLASS_NAME_TO_ACTIVITY_INFO_MAP.get(className) : null);
     }
 
     // TODO needs to support rest type of components.
@@ -585,12 +586,12 @@ public final class IncrementComponentManager {
         final ComponentName component = intent.getComponent();
         if (component != null) {
             final String compName = component.getClassName();
-            if (sClassNameToActivityInfoMap.containsKey(compName)) {
+            if (CLASS_NAME_TO_ACTIVITY_INFO_MAP.containsKey(compName)) {
                 bestComponentName = compName;
                 maxPriority = 0;
             }
         } else {
-            for (Map.Entry<String, IntentFilter> item : sClassNameToIntentFilterMap.entrySet()) {
+            for (Map.Entry<String, IntentFilter> item : CLASS_NAME_TO_INTENT_FILTER_MAP.entrySet()) {
                 final String componentName = item.getKey();
                 final IntentFilter intentFilter = item.getValue();
                 final int matchRes = intentFilter.match(intent.getAction(), intent.getType(),
@@ -610,7 +611,7 @@ public final class IncrementComponentManager {
         }
         if (bestComponentName != null) {
             final ResolveInfo result = new ResolveInfo();
-            result.activityInfo = sClassNameToActivityInfoMap.get(bestComponentName);
+            result.activityInfo = CLASS_NAME_TO_ACTIVITY_INFO_MAP.get(bestComponentName);
             result.filter = respFilter;
             result.match = bestMatchRes;
             result.priority = maxPriority;

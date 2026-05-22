@@ -17,7 +17,7 @@
 package com.tencent.tinker.build.apkparser;
 
 import com.tencent.tinker.build.patch.Configuration;
-import com.tencent.tinker.commons.util.StreamUtil;
+import com.tencent.tinker.commons.util.IOHelper;
 
 import org.w3c.dom.Document;
 import org.w3c.dom.NamedNodeMap;
@@ -146,7 +146,7 @@ public class AndroidParser {
             fileOutputStream = new FileOutputStream(destFile);
             fileOutputStream.write(array);
         } finally {
-            StreamUtil.closeQuietly(fileOutputStream);
+            IOHelper.closeQuietly(fileOutputStream);
         }
     }
 
@@ -276,6 +276,8 @@ public class AndroidParser {
                             case "meta-data":
                                 NamedNodeMap attributes = child.getAttributes();
                                 metaDatas.put(getAttribute(attributes, "android:name"), getAttribute(attributes, "android:value"));
+                                break;
+                            default:
                                 break;
                         }
                     }

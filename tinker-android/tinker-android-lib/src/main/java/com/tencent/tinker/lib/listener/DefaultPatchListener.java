@@ -16,8 +16,14 @@
 
 package com.tencent.tinker.lib.listener;
 
+import android.content.ComponentName;
 import android.content.Context;
+import android.content.Intent;
+import android.content.ServiceConnection;
+import android.os.IBinder;
+import android.text.TextUtils;
 
+import com.tencent.tinker.lib.service.TinkerPatchForeService;
 import com.tencent.tinker.lib.service.TinkerPatchService;
 import com.tencent.tinker.lib.tinker.Tinker;
 import com.tencent.tinker.lib.tinker.TinkerLoadResult;
@@ -25,15 +31,19 @@ import com.tencent.tinker.lib.util.TinkerServiceInternals;
 import com.tencent.tinker.lib.util.UpgradePatchRetry;
 import com.tencent.tinker.loader.shareutil.ShareConstants;
 import com.tencent.tinker.loader.shareutil.SharePatchFileUtil;
+import com.tencent.tinker.loader.shareutil.SharePatchInfo;
 import com.tencent.tinker.loader.shareutil.ShareTinkerInternals;
 
 import java.io.File;
+
+import static android.content.Context.BIND_AUTO_CREATE;
 
 /**
  * Created by zhangshaowen on 16/3/14.
  */
 public class DefaultPatchListener implements PatchListener {
     protected final Context context;
+    private ServiceConnection connection;
 
     public DefaultPatchListener(Context context) {
         this.context = context;
@@ -48,26 +58,74 @@ public class DefaultPatchListener implements PatchListener {
      */
     @Override
     public int onPatchReceived(String path) {
-        File patchFile = new File(path);
+        return checkPackageAndRunPatchService(path, false);
+    }
 
-        int returnCode = patchCheck(path, SharePatchFileUtil.getMD5(patchFile));
-
+    /**
+     * Check patch package then start patch service to generate patched artifacts.
+     * @param path
+     *   Path to your patch package.
+     * @param useEmergencyMode
+     *   true for using emergency mode, otherwise false.
+     *
+     *   By using emergency mode, dex2oat triggering procedure will be done asynchronously on Android Q and newer
+     *   system to save costs. If your app lives too short to wait for generating patch artifacts, this mode should
+     *   help. **However, the performance of your patched app will become terribly worse since odex of patched dex(es)
+     *   may not be generated before loading patched artifacts in this mode.**
+     */
+    protected int checkPackageAndRunPatchService(String path, boolean useEmergencyMode) {
+        final File patchFile = new File(path);
+        final String patchMD5 = SharePatchFileUtil.getMD5(patchFile);
+        final int returnCode = patchCheck(path, patchMD5);
         if (returnCode == ShareConstants.ERROR_PATCH_OK) {
-            TinkerPatchService.runPatchService(context, path);
+            runForgService();
+            TinkerPatchService.runPatchService(context, path, useEmergencyMode);
         } else {
             Tinker.with(context).getLoadReporter().onLoadPatchListenerReceiveFail(new File(path), returnCode);
         }
         return returnCode;
     }
 
+    private void runForgService() {
+        try {
+            connection = new ServiceConnection() {
+                @Override
+                public void onServiceConnected(ComponentName name, IBinder service) {
+                }
+
+                @Override
+                public void onServiceDisconnected(ComponentName name) {
+                    if (context != null && connection != null) {
+                        try {
+                            //Tinker在完成补丁后会尝试kill掉patch进程，如果不unbind会导致patch进程重启
+                            context.unbindService(connection);
+                        } catch (Throwable ignored) {
+                            // Ignored.
+                        }
+                    }
+                }
+
+                @Override
+                public void onBindingDied(ComponentName name) {
+                }
+            };
+            Intent innerForgIntent = new Intent(context, TinkerPatchForeService.class);
+            context.bindService(innerForgIntent, connection, BIND_AUTO_CREATE);
+        } catch (Throwable ex) {
+            //ignore forground service start error
+        }
+    }
+
     protected int patchCheck(String path, String patchMd5) {
-        Tinker manager = Tinker.with(context);
+        final Tinker manager = Tinker.with(context);
         //check SharePreferences also
         if (!manager.isTinkerEnabled() || !ShareTinkerInternals.isTinkerEnableWithSharedPreferences(context)) {
             return ShareConstants.ERROR_PATCH_DISABLE;
         }
-        File file = new File(path);
-
+        if (TextUtils.isEmpty(patchMd5)) {
+            return ShareConstants.ERROR_PATCH_NOTEXIST;
+        }
+        final File file = new File(path);
         if (!SharePatchFileUtil.isLegalFile(file)) {
             return ShareConstants.ERROR_PATCH_NOTEXIST;
         }
@@ -85,15 +143,25 @@ public class DefaultPatchListener implements PatchListener {
             return ShareConstants.ERROR_PATCH_JIT;
         }
 
-        Tinker tinker = Tinker.with(context);
+        final TinkerLoadResult loadResult = manager.getTinkerLoadResultIfPresent();
+        // only call repair on main process
+        final boolean repairOptNeeded = manager.isMainProcess()
+                && loadResult != null && loadResult.useInterpretMode;
 
-        if (tinker.isTinkerLoaded()) {
-            TinkerLoadResult tinkerLoadResult = tinker.getTinkerLoadResultIfPresent();
-            if (tinkerLoadResult != null && !tinkerLoadResult.useInterpretMode) {
-                String currentVersion = tinkerLoadResult.currentVersion;
-                if (patchMd5.equals(currentVersion)) {
-                    return ShareConstants.ERROR_PATCH_ALREADY_APPLY;
+        if (!repairOptNeeded) {
+            // Hit if we have already applied patch but main process did not restart.
+            final String patchDirectory = manager.getPatchDirectory().getAbsolutePath();
+            File patchInfoLockFile = SharePatchFileUtil.getPatchInfoLockFile(patchDirectory);
+            File patchInfoFile = SharePatchFileUtil.getPatchInfoFile(patchDirectory);
+            try {
+                final SharePatchInfo currInfo = SharePatchInfo.readAndCheckPropertyWithLock(patchInfoFile, patchInfoLockFile);
+                if (currInfo != null && !ShareTinkerInternals.isNullOrNil(currInfo.newVersion) && !currInfo.newVersion.equals(currInfo.versionToRemove)) {
+                    if (patchMd5.equals(currInfo.newVersion)) {
+                        return ShareConstants.ERROR_PATCH_ALREADY_APPLY;
+                    }
                 }
+            } catch (Throwable ignored) {
+                // Ignored.
             }
         }
 
@@ -103,5 +171,4 @@ public class DefaultPatchListener implements PatchListener {
 
         return ShareConstants.ERROR_PATCH_OK;
     }
-
 }

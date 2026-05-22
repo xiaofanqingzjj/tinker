@@ -17,7 +17,6 @@
 package com.tencent.tinker.loader.shareutil;
 
 import android.os.Build;
-import android.util.Log;
 
 import com.tencent.tinker.loader.TinkerRuntimeException;
 
@@ -33,23 +32,46 @@ import java.util.Properties;
 public class SharePatchInfo {
     private static final String TAG = "Tinker.PatchInfo";
 
-    public static final int    MAX_EXTRACT_ATTEMPTS = ShareConstants.MAX_EXTRACT_ATTEMPTS;
-    public static final String OLD_VERSION          = ShareConstants.OLD_VERSION;
-    public static final String NEW_VERSION          = ShareConstants.NEW_VERSION;
-    public static final String FINGER_PRINT         = "print";
-    public static final String OAT_DIR              = "dir";
-    public static final String DEFAULT_DIR   = ShareConstants.DEFAULT_DEX_OPTIMIZE_PATH;
+    public static final int    MAX_EXTRACT_ATTEMPTS        = ShareConstants.MAX_EXTRACT_ATTEMPTS;
+    public static final String OLD_VERSION                 = ShareConstants.OLD_VERSION;
+    public static final String NEW_VERSION                 = ShareConstants.NEW_VERSION;
+    public static final String IS_PROTECTED_APP            = ShareConstants.PKGMETA_KEY_IS_PROTECTED_APP;
+    public static final String USE_CUSTOM_FILE_PATCH       = ShareConstants.PKGMETA_KEY_USE_CUSTOM_FILE_PATCH;
+    public static final String VERSION_TO_REMOVE           = "version_to_remove";
+    public static final String FINGER_PRINT                = "print";
+    public static final String OAT_DIR                     = "dir";
+    public static final String IS_REMOVE_INTERPRET_OAT_DIR = "is_remove_interpret_oat_dir";
+    public static final String DEFAULT_DIR                 = ShareConstants.DEFAULT_DEX_OPTIMIZE_PATH;
+
+    /*
+     * The meaning of this field has changed after moving cleaning task to patch process.
+     *      Before: Version of previous patch.
+     *      After: Version of patch which active main process is used.
+     */
     public String oldVersion;
     public String newVersion;
+    public boolean isProtectedApp;
+    public boolean useCustomPatch;
+
+    /**
+     * @deprecated Patch version directories cleaning is moved from main process to patch process,
+     *             this should always be an empty string.
+     */
+    @Deprecated
+    public String versionToRemove;
     public String fingerPrint;
     public String oatDir;
+    public boolean isRemoveInterpretOATDir;
 
-    public SharePatchInfo(String oldVer, String newVew, String finger, String oatDir) {
+    public SharePatchInfo(String oldVer, String newVer, boolean isProtectedApp, boolean useCustomPatch, String versionToRemove, String finger, String oatDir, boolean isRemoveInterpretOATDir) {
         // TODO Auto-generated constructor stub
         this.oldVersion = oldVer;
-        this.newVersion = newVew;
+        this.newVersion = newVer;
+        this.isProtectedApp = isProtectedApp;
+        this.versionToRemove = versionToRemove;
         this.fingerPrint = finger;
         this.oatDir = oatDir;
+        this.isRemoveInterpretOATDir = isRemoveInterpretOATDir;
     }
 
     public static SharePatchInfo readAndCheckPropertyWithLock(File pathInfoFile, File lockFile) {
@@ -74,7 +96,7 @@ public class SharePatchInfo {
                     fileLock.close();
                 }
             } catch (IOException e) {
-                Log.w(TAG, "releaseInfoLock error", e);
+                ShareTinkerLog.w(TAG, "releaseInfoLock error", e);
             }
         }
 
@@ -102,7 +124,7 @@ public class SharePatchInfo {
                     fileLock.close();
                 }
             } catch (IOException e) {
-                Log.i(TAG, "releaseInfoLock error", e);
+                ShareTinkerLog.i(TAG, "releaseInfoLock error", e);
             }
 
         }
@@ -115,8 +137,11 @@ public class SharePatchInfo {
         String oldVer = null;
         String newVer = null;
         String lastFingerPrint = null;
-        String oatDIr = null;
-
+        boolean isProtectedApp = false;
+        boolean useCustomPatch = false;
+        String versionToRemove = null;
+        String oatDir = null;
+        boolean isRemoveInterpretOATDir = false;
         while (numAttempts < MAX_EXTRACT_ATTEMPTS && !isReadPatchSuccessful) {
             numAttempts++;
             Properties properties = new Properties();
@@ -126,11 +151,17 @@ public class SharePatchInfo {
                 properties.load(inputStream);
                 oldVer = properties.getProperty(OLD_VERSION);
                 newVer = properties.getProperty(NEW_VERSION);
+                final String isProtectedAppStr = properties.getProperty(IS_PROTECTED_APP);
+                isProtectedApp = (isProtectedAppStr != null && !isProtectedAppStr.isEmpty() && !"0".equals(isProtectedAppStr));
+                final String useCustomPatchStr = properties.getProperty(USE_CUSTOM_FILE_PATCH);
+                useCustomPatch = (useCustomPatchStr != null && !useCustomPatchStr.isEmpty() && !"0".equals(useCustomPatchStr));
+                versionToRemove = properties.getProperty(VERSION_TO_REMOVE);
                 lastFingerPrint = properties.getProperty(FINGER_PRINT);
-                oatDIr = properties.getProperty(OAT_DIR);
+                oatDir = properties.getProperty(OAT_DIR);
+                final String isRemoveInterpretOATDirStr = properties.getProperty(IS_REMOVE_INTERPRET_OAT_DIR);
+                isRemoveInterpretOATDir = (isRemoveInterpretOATDirStr != null && !isRemoveInterpretOATDirStr.isEmpty() && !"0".equals(isRemoveInterpretOATDirStr));
             } catch (IOException e) {
-//                e.printStackTrace();
-                Log.w(TAG, "read property failed, e:" + e);
+                ShareTinkerLog.w(TAG, "read property failed, e:" + e);
             } finally {
                 SharePatchFileUtil.closeQuietly(inputStream);
             }
@@ -141,7 +172,7 @@ public class SharePatchInfo {
             //oldVer may be "" or 32 md5
             if ((!oldVer.equals("") && !SharePatchFileUtil.checkIfMd5Valid(oldVer))
                 || !SharePatchFileUtil.checkIfMd5Valid(newVer)) {
-                Log.w(TAG, "path info file  corrupted:" + pathInfoFile.getAbsolutePath());
+                ShareTinkerLog.w(TAG, "path info file  corrupted:" + pathInfoFile.getAbsolutePath());
                 continue;
             } else {
                 isReadPatchSuccessful = true;
@@ -149,7 +180,7 @@ public class SharePatchInfo {
         }
 
         if (isReadPatchSuccessful) {
-            return new SharePatchInfo(oldVer, newVer, lastFingerPrint, oatDIr);
+            return new SharePatchInfo(oldVer, newVer, isProtectedApp, useCustomPatch, versionToRemove, lastFingerPrint, oatDir, isRemoveInterpretOATDir);
         }
 
         return null;
@@ -166,16 +197,24 @@ public class SharePatchInfo {
         if (ShareTinkerInternals.isNullOrNil(info.oatDir)) {
             info.oatDir = DEFAULT_DIR;
         }
-        Log.i(TAG, "rewritePatchInfoFile file path:"
+        ShareTinkerLog.i(TAG, "rewritePatchInfoFile file path:"
             + pathInfoFile.getAbsolutePath()
             + " , oldVer:"
             + info.oldVersion
             + ", newVer:"
             + info.newVersion
+            + ", isProtectedApp:"
+            + (info.isProtectedApp ? 1 : 0)
+            + ", versionToRemove:"
+            + info.versionToRemove
             + ", fingerprint:"
             + info.fingerPrint
             + ", oatDir:"
-            + info.oatDir);
+            + info.oatDir
+            + ", isRemoveInterpretOATDir:"
+            + (info.isRemoveInterpretOATDir ? 1 : 0)
+            + ", stack: " + android.util.Log.getStackTraceString(new Throwable())
+        );
 
         boolean isWritePatchSuccessful = false;
         int numAttempts = 0;
@@ -191,8 +230,12 @@ public class SharePatchInfo {
             Properties newProperties = new Properties();
             newProperties.put(OLD_VERSION, info.oldVersion);
             newProperties.put(NEW_VERSION, info.newVersion);
+            newProperties.put(IS_PROTECTED_APP, (info.isProtectedApp ? "1" : "0"));
+            newProperties.put(USE_CUSTOM_FILE_PATCH, (info.useCustomPatch ? "1" : "0"));
+            newProperties.put(VERSION_TO_REMOVE, info.versionToRemove);
             newProperties.put(FINGER_PRINT, info.fingerPrint);
             newProperties.put(OAT_DIR, info.oatDir);
+            newProperties.put(IS_REMOVE_INTERPRET_OAT_DIR, (info.isRemoveInterpretOATDir ? "1" : "0"));
 
             FileOutputStream outputStream = null;
             try {
@@ -200,8 +243,7 @@ public class SharePatchInfo {
                 String comment = "from old version:" + info.oldVersion + " to new version:" + info.newVersion;
                 newProperties.store(outputStream, comment);
             } catch (Exception e) {
-//                e.printStackTrace();
-                Log.w(TAG, "write property failed, e:" + e);
+                ShareTinkerLog.w(TAG, "write property failed, e:" + e);
             } finally {
                 SharePatchFileUtil.closeQuietly(outputStream);
             }
@@ -213,12 +255,6 @@ public class SharePatchInfo {
                 pathInfoFile.delete();
             }
         }
-        if (isWritePatchSuccessful) {
-            return true;
-        }
-
-        return false;
+        return isWritePatchSuccessful;
     }
-
-
 }
